@@ -1,0 +1,23 @@
+---
+title: "Parsing 2025-2026"
+output: html_document
+---
+
+Packages:
+```{r}
+library(readr)
+library(tidyr)
+library(dplyr)
+library(stringr)
+```
+
+C. Elegans worms were treated with Ethanol, Yucca, and Resveratrol solutions and their average movements were recorded using a Wiggleometer, the data was uploaded onto a csv. There are currently 20 cvs that were recorded over the course of several months. This files serves to parse the data.
+
+Extracted data:
+- Average activity counts per data intervals
+- Standard Error
+
+Excluded points:
+- 
+
+
