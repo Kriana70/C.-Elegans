@@ -5,19 +5,107 @@ output: html_document
 
 Packages:
 ```{r}
+library(tidyverse)
 library(readr)
-library(tidyr)
-library(dplyr)
 library(stringr)
+library(vroom)
+
+#setting it up in the right directory
+knitr::opts_knit$set(root.dir = "C:/Users/krian/OneDrive/Documentos/Bioinfo/C.Elegans/data")
 ```
 
-C. Elegans worms were treated with Ethanol, Yucca, and Resveratrol solutions and their average movements were recorded using a Wiggleometer, the data was uploaded onto a csv. There are currently 20 cvs that were recorded over the course of several months. This files serves to parse the data.
+C. Elegans worms were treated with Ethanol, Yucca, and Resveratrol solutions and their average movements were recorded using a Wiggleometer, the data was uploaded onto a csv. There are currently 19 cvs that were recorded over the course of several months. This files serves to parse the data.
 
-Extracted data:
+###Explanation:
+*Ethanol*: resveratrol and yucca is dissolved in ethanol - used as a control to see the effects
+*Yucca*: ***Treatment Group*** An alleged superfood with antioxidant properties, seeing the extent of health benefits by testing it on worms (plant spanning 50 genuses native to north america)
+*Resveratrol*: ***positive control*** phylotoalexin that has anti-inflammatory properties found in Yucca 
+
+**NT = no treatment
+ETOH = ethanol
+RV = resveratrol
+YS = Yucca
+
+###Extracted data:
 - Average activity counts per data intervals
-- Standard Error
+- Standard Error (later/optional)
 
-Excluded points:
-- 
+###Excluded points:
+- first 3 hours
+- M9_CTRL (media control) 
+- All mutants; DAF16X, TJ356GFP, MR13, OWL13 (ONLY INCLUDE N2 and NT_YS)
 
+**Code Outline**
+Beginning
+run all libraries
+ turn all lines into raw data
+ (start marker) grep "Group Activity: Average Activity Counts per Data Interval" *look for core phrase only, formatting with "<<>>" is not consistant among files*
+ (end marker) grep ""Group Activity: Standard Error"
+ only take lines from between these two markers *we only care about this one table*
+ save into a variable END
+ 
+START - clean the data some more
+- filter rows to only keep samples with "N2" OR "NT_YS" in the name
+- remove timepoints <= 180 mins
+- pivot into long format
+- print to file 
+DONE
+ 
+ 
+```{r}
+
+setwd("C:/Users/krian/OneDrive/Documentos/Bioinfo/C.Elegans/data") 
+
+extract_avg_activity <- function(file) {
+  
+  raw <- iconv(readLines(file, warn = FALSE, encoding = "latin1"),
+               from = "latin1", to = "UTF-8")
+  
+  start <- grep("Group Activity: Average Activity Counts per Data Interval", raw)[1]
+  end   <- grep("Group Activity: Standard Error", raw)[1]
+  
+  table_lines <- raw[(start + 1):(end - 1)]
+  
+  df <- readr::read_csv(
+    paste(table_lines, collapse = "\n"),
+    col_types = readr::cols(.default = "c")
+  )
+  
+  # 1. Keep only N2 and NT_YS groups BEFORE pivoting
+  df <- df %>% 
+    filter(str_detect(.[[1]], "N2") | str_detect(.[[1]], "NT_YS"))
+  
+  # 2. Remove empty columns BEFORE pivoting
+  #df <- df[, colSums(!is.na(df)) > 0]
+  
+  # 3. Remove timepoints <= 180 BEFORE pivoting
+  #    (we detect numeric column names)
+  numeric_cols <- suppressWarnings(as.numeric(names(df)[-1]))
+  keep_cols <- which(numeric_cols > 180) + 1  # +1 to skip group column
+  
+  df <- df[, c(1, keep_cols)]
+  
+  # 4. Now pivot safely
+  long <- df %>%
+    rename(group = 1) %>%
+    pivot_longer(
+      cols = -group,
+      names_to = "Time_min",
+      values_to = "AvgActivity"
+    ) %>%
+    mutate(
+      Time_min = as.numeric(Time_min),
+      AvgActivity = as.numeric(AvgActivity)
+    ) %>%
+    filter(!is.na(Time_min) & !is.na(AvgActivity))
+  
+  return(long)
+}
+# Example:
+clean_filtered <- extract_avg_activity("02_26_26_N2_OAP_AND_KID_NT_ETOH_RV_YS_NG_LS_BL_LL_AP.csv")
+
+#Save in another file
+write_csv(clean_filtered,
+          "C:/Users/krian/OneDrive/Documentos/Bioinfo/C.Elegans/clean data/02_26_26_cleaned.csv")
+```
 
